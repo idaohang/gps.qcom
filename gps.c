@@ -334,7 +334,8 @@ static void ril_ni_message(uint8_t *msg, size_t len)
 
 static void ril_update_network_state(int connected, int type, int roaming, const char *extra_info)
 {
-	char *dup_extra_info = strdup(extra_info), *free_extra_info;
+	char *dup_extra_info, *free_extra_info;
+	dup_extra_info = extra_info ? strdup(extra_info) : NULL;
 	CLIENT_LOCK();
 	gps_client.network_state.connected = connected;
 	gps_client.network_state.type = type;
