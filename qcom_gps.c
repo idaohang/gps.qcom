@@ -917,6 +917,7 @@ static int server_send_STATUS(void)
    needs to reconfigure itself for, and sends the request to the server */
 void server_send_thread(void *arg)
 {
+	int requested_xtra = 0;
 	TRACEV_ENTER();
 
 	while (!loc_api_glue_init()) {
@@ -962,6 +963,13 @@ void server_send_thread(void *arg)
 		if (engine_off) {
 			SERVER_CHECK_SEND(STATUS);
 			continue;
+		}
+
+		if (!requested_xtra && !gps_client.xtra.len) {
+			requested_xtra = 1;
+			CB(xtra_cb, download_request_cb, ());
+		} else if (gps_client.xtra.len) {
+			requested_xtra = 0;
 		}
 
 #if AMSS_VERSION==1240
