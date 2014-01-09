@@ -919,6 +919,11 @@ void server_send_thread(void *arg)
 {
 	TRACEV_ENTER();
 
+	while (!loc_api_glue_init()) {
+		FUNC_ALOGW("loc_api_glue_init() failed, trying again...\n");
+		sleep(1);
+	}
+
 	CLIENT_LOCK();
 	while (1) {
 		int updated_flags;

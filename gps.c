@@ -40,8 +40,6 @@ static int gps_init(GpsCallbacks *callbacks)
 
 	CB(cb, set_capabilities_cb, (caps));
 
-	loc_api_glue_init();
-
 	CLIENT_LOCK();
 	gps_client.status = GPS_STATUS_ENGINE_ON;
 	gps_client.updated_flags = GPS_CLIENT_UPDATED_STATUS;
