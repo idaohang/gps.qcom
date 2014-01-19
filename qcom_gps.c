@@ -1,10 +1,13 @@
 #include "gps.h"
 
 #include <sys/types.h>
+#include <sys/time.h>
 #include <sys/socket.h>
 #include <netdb.h>
 
 #include <netinet/in.h>
+
+#define XTRA_UPLOAD_TIMEOUT	5	/* seconds */
 
 /* ========================   Server-side   ========================= */
 
@@ -584,7 +587,11 @@ static int server_send_XTRA(void)
 	rpc_loc_ioctl_data_u_type ioctl_data;
 	rpc_loc_predicted_orbits_data_s_type *data =
 		&ioctl_data.rpc_loc_ioctl_data_u_type_u.predicted_orbits_data;
-	unsigned int part_len, i, parts;
+	unsigned int part_len, i, parts, tries;
+	struct timeval tv;
+
+	gettimeofday(&tv, NULL);
+	tv.tv_sec += XTRA_UPLOAD_TIMEOUT;
 
 	ioctl_data.disc = RPC_LOC_IOCTL_INJECT_PREDICTED_ORBITS_DATA;
 
@@ -595,6 +602,8 @@ static int server_send_XTRA(void)
 	if (!part_len) part_len = 1024;
 	data->total_parts = parts = (gps_client.xtra.len + part_len - 1) / part_len;
 	FUNC_ALOGV("sending xtra %u*%u byte parts\n", parts, part_len);
+	tries = 0;
+retry:
 	for (i = 1; i <= parts; ++i) {
 		int ret;
 
@@ -609,10 +618,22 @@ static int server_send_XTRA(void)
 		data->data_ptr.data_ptr_len = data->part_len;
 		ret = loc_ioctl(gps_server.handle, ioctl_data.disc, &ioctl_data);
 		if (ret != RPC_LOC_API_SUCCESS) {
-			FUNC_ALOGW("XTRA injection failed on part %d/%d (%d)\n", i, parts, ret);
+			if (!tries++ || ret != RPC_LOC_API_ENGINE_BUSY)
+				FUNC_ALOGW("XTRA injection failed on part %d/%d (%d)\n", i, parts, ret);
+
+			if (ret == RPC_LOC_API_ENGINE_BUSY) {
+				struct timeval now;
+				gettimeofday(&now, NULL);
+				if (now.tv_sec < tv.tv_sec || (now.tv_sec == tv.tv_sec && now.tv_usec < tv.tv_usec))
+					goto retry;
+			}
 			return -1;
 		} else {
-			FUNC_ALOGV("uploaded part %u/%u (%u bytes)\n", i, parts, data->part_len);
+			if (tries) {
+				FUNC_ALOGW("uploaded part %u/%u (%u bytes, %d retries)\n", i, parts, data->part_len, tries);
+			} else {
+				FUNC_ALOGV("uploaded part %u/%u (%u bytes)\n", i, parts, data->part_len);
+			}
 		}
 	}
 
