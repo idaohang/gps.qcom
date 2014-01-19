@@ -967,7 +967,9 @@ void server_send_thread(void *arg)
 
 		if (!requested_xtra && !gps_client.xtra.len) {
 			requested_xtra = 1;
+			CLIENT_UNLOCK();
 			CB(xtra_cb, download_request_cb, ());
+			CLIENT_LOCK();
 		} else if (gps_client.xtra.len) {
 			requested_xtra = 0;
 		}
